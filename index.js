@@ -5,6 +5,7 @@ const cors = require('cors')
 
 app.use(cors())
 app.use(express.json())
+app.use(express.static('dist'))
 
 //3.8*: Phonebook backend step8 (created a new token and added to the .use)
 morgan.token('type', (req, res) => {
