@@ -3,42 +3,40 @@ require('dotenv').config();
 
 const url = process.env.MONGODB_URI;
 
-console.log('Connecting to MongoDB...');
-mongoose.connect(url, { useNewUrlParser: true, useUnifiedTopology: true })
+console.log('Connecting to MongoDB...', url);
+mongoose.connect(url)
     .then(result => {
-        console.log('Connected to MongoDB in contact.js');
+        console.log('Connected to MongoDB');
     })
     .catch((error) => {
-        console.log('Error connecting to MongoDB in contact.js:', error.message);
+        console.log('Error connecting to MongoDB:', error.message);
     });
 
 const phonebookSchema = new mongoose.Schema({
-    name: String,
-    number: String,
-});
-
-const Contact = mongoose.model('Contact', phonebookSchema);
-
-// Check for the right arguments with a clean way of defining objects.
-if (process.argv.length === 5) {
-    const name = process.argv[3];
-    const number = process.argv[4];
-    const newContact = new Contact({
-        name,
-        number,
+    name: {
+        type: String,
+        minLength: 3, 
+        required: true
+    },
+    number: {
+        type: String,
+        minLength: 8,
+        required: true, 
+    validate: {
+        validator: function(v) {
+            return /\d{2}-\d{8}/.test(v) || /\d{3}-\d{7}/.test(v)
+          }, 
+          message: props => `${props.value} is not a valid phone number!`
+        }}
     });
-    newContact.save().then(() => {
-        console.log(`Added ${name} number ${number} to phonebook`);
-        mongoose.connection.close();
-    });
-} else {
-    Contact.find({}).then((contacts) => {
-        console.log('Phonebook:');
-        contacts.forEach((contact) => {
-            console.log(contact.name, contact.number);
-        });
-        mongoose.connection.close();
-    });
-}
 
-module.exports = Contact;
+
+phonebookSchema.set('toJSON', {
+    transform: (document, returnedObject) => {
+      returnedObject.id = returnedObject._id.toString()
+      delete returnedObject._id
+      delete returnedObject.__v
+    }
+  })
+
+module.exports = mongoose.model('Contact', phonebookSchema)

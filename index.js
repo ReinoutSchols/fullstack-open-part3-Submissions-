@@ -1,109 +1,136 @@
 const express = require('express')
-const morgan = require('morgan');
+const morgan = require('morgan')
 const app = express()
 const cors = require('cors')
+const mongoose = require('mongoose')
+require('dotenv').config()
+const Contact = require('./models/contact')
 
-app.use(cors())
-app.use(express.json())
 app.use(express.static('dist'))
+app.use(express.json())
+app.use(cors())
 
-//3.8*: Phonebook backend step8 (created a new token and added to the .use)
+
+// Using morgan to simplify logging 
 morgan.token('type', (req, res) => {
-  return JSON.stringify(req.body);
+  return JSON.stringify(req.body)
 });
-app.use(morgan(':method :url :status :res[content-length] - :response-time ms :type'));
+app.use(morgan(':method :url :status :res[content-length] - :response-time ms :type'))
 
-let persons = [
-    { 
-      "id": 1,
-      "name": "Arto Hellas", 
-      "number": "040-123456"
-    },
-    { 
-      "id": 2,
-      "name": "Ada Lovelace", 
-      "number": "39-44-5323523"
-    },
-    { 
-      "id": 3,
-      "name": "Dan Abramov", 
-      "number": "12-43-234345"
-    },
-    { 
-      "id": 4,
-      "name": "Mary Poppendieck", 
-      "number": "39-23-6423122"
+// Getting all contacts
+app.get('/api/persons', (request, response, next) => {
+  Contact.find({}).then(contacts => {
+    if(contacts) {
+      response.json(contacts)
+    } else {
+      throw {status: 404, message: "No contacts found."}
     }
-]
+  })
+  .catch(error => next(error))
+  })
 
-// 3.1: Phonebook backend step1 (Done)
-app.get('/api/persons', (request, response) => {
-  response.json(persons);
-})
 
-// 3.2: Phonebook backend step2
+//  getting the info of the phonebook
 app.get('/info', (request, response) => {
-    const numberOfEntries = persons.length;
-    const dateRequest =  new Date().toUTCString();
-    response.send(`<p>Phonebook has info for ${numberOfEntries} people</p> ${dateRequest}`);
-  })
-
-  // 3.3: Phonebook backend step3
-  app.get('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-    console.log(id)
-    const person = persons.find(person => person.id === id)
-    person ? response.json(person): response.status(404).end();
-    
-  })
-
-  // 3.4: Phonebook backend step4
-app.delete('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id);
-    console.log(id);
-    persons = persons.filter(person => person.id !== id);
-    console.log(persons);
-    response.status(204).end();
+     Contact.countDocuments({})
+     .then((numberOfEntries) => {
+      console.log(numberOfEntries)
+      const dateRequest =  new Date().toUTCString();
+      response.send(`<p>Phonebook has info for ${numberOfEntries} people</p> ${dateRequest}`)
+    })
+    .catch((error) => next(error))
 })
 
-// 3.5: Phonebook backend step5
-// 3.6: Phonebook backend step6
+// Getting contacts by ID
+  app.get('/api/persons/:id', (request, response, next) => {
+    const id = request.params.id;
+    console.log('Fetching person with ID:', id);
+    Contact.findById(id)
+    .then(result => {
+      if (result) {
+        response.json(result)
+      } else {
+        response.status(404).end()
+      }
+    })
+    .catch(error => next(error))
+  })
 
-const randomId = () => {
-    const randomId = Math.floor(Math.random() * 1000);
-    console.log(randomId);
-    return randomId;
-}
+  // Deleting contacts
+app.delete('/api/persons/:id', (request, response, next) => {
+    Contact.findByIdAndDelete(request.params.id)
+    .then(result => {
+      if (result) {
+        response.status(204).end()
+    } else {
+      throw {status: 404, message: "Contact not found"}
+      }
+    })
+    .catch(error => next(error))
+  })
 
-app.post('/api/persons', (request, response) => {
+   // Creating new contacts
+app.post('/api/persons', (request, response, next) => {
+  const body = request.body;
+  const contact = new Contact ({ 
+       name: body.name,
+      number: body.number
+      });
+  contact.save().then(savedContact => {
+    console.log('Contact saved successfully:', savedContact);
+    response.json(savedContact)
+  })
+  .catch(error => next(error))
+})
+
+// updating contacts
+app.put('/api/persons/:id', (request, response, next) => {
   const body = request.body;
 
-  if (!body.name || !body.number) {
-      return response.status(400).json({ 
-          error: 'name or number is missing' 
-      });
-  }
-
-  if (persons.some(person => person.name === body.name)) {
-      return response.status(400).json({ 
-          error: 'name must be unique' 
-      });
-  }
-
-  const person = { 
-      name: body.name, 
-      number: body.number,
-      id: randomId(),
-  };
-
-  persons = persons.concat(person);
-  response.status(201).json(person);
-});
+  Contact.findOne({ name: body.name })
+    .then(existingContact => {
+      if (existingContact) {
+        existingContact.number = body.number;
+        return existingContact.save();
+      } else {
+        const newContact = new Contact({
+          name: body.name,
+          number: body.number
+        });
+        return newContact.save();
+      }
+    })
+    .then(updatedContact => {
+      console.log('Contact updated/saved successfully:', updatedContact);
+      response.json(updatedContact);
+    })
+    .catch(error => next(error))
+  })
 
 
+const unknownEndpoint = (request, response) => {
+  response.status(404).send({ error: 'unknown endpoint' })
+}
+
+app.use(unknownEndpoint)
+
+const errorHandler = (error, request, response, next) => {
+  console.log(error.message);
+
+  if (error.name === "CastError") {
+    return response.status(400).send({ error: 'malformatted id' });
+  } else if (error.name === 'ValidationError') {
+    //console.log('Validation error:', error.message);
+    return response.status(400).json({ error: error.message });
+  } 
+  next(error);
+};
+
+app.use(errorHandler)
 
 
-const PORT = process.env.PORT || 3001
+
+const PORT = process.env.PORT 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
 })
