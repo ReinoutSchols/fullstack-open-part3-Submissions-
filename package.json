@@ -8,7 +8,8 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "build:ui": "rm -rf dist && cd ../fullstack-open-part2-Submissions/phonebook && npm run build && cp -r dist ../../fullstack-open-part3-Submissions",
-    "deploy:full": "npm run build:ui && git add . && git commit -m uibuild && git push"
+    "deploy:full": "npm run build:ui && git add . && git commit -m uibuild && git push", 
+    "lint": "eslint ."
   },
   "author": "Reinout Schols",
   "license": "ISC",
@@ -20,6 +21,11 @@
     "morgan": "^1.10.0"
   },
   "devDependencies": {
+    "eslint": "^8.56.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-n": "^16.6.1",
+    "eslint-plugin-promise": "^6.1.1",
     "nodemon": "^3.0.2"
   }
 }
